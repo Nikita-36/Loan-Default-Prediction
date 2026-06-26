@@ -1,0 +1,144 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+    confusion_matrix,
+    ConfusionMatrixDisplay
+)
+
+df = pd.read_csv("Default_Fin.csv")
+print(df.columns.tolist())
+
+print(df.head())
+
+print(df.info())
+
+print(df.describe())
+
+print(df.isnull().sum())
+
+for column in df.columns:
+    if df[column].dtype == "object":
+        df[column] = df[column].fillna(df[column].mode()[0])
+    else:
+        df[column] = df[column].fillna(df[column].median())
+
+encoder = LabelEncoder()
+
+for column in df.columns:
+    if df[column].dtype == "object":
+        df[column] = encoder.fit_transform(df[column])
+
+X = df.drop(columns=["Index", "Defaulted?"])
+y = df["Defaulted?"]
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    y,
+    test_size=0.2,
+    random_state=42,
+    stratify=y
+)
+
+log_model = LogisticRegression(max_iter=1000)
+
+log_model.fit(X_train, y_train)
+
+log_pred = log_model.predict(X_test)
+
+log_prob = log_model.predict_proba(X_test)[:,1]
+
+print("\n===== Logistic Regression =====")
+
+print("Accuracy :", accuracy_score(y_test, log_pred))
+
+print("Precision :", precision_score(y_test, log_pred))
+
+print("Recall :", recall_score(y_test, log_pred))
+
+print("ROC AUC :", roc_auc_score(y_test, log_prob))
+
+rf_model = RandomForestClassifier(
+    n_estimators=100,
+    random_state=42
+)
+
+rf_model.fit(X_train, y_train)
+
+rf_pred = rf_model.predict(X_test)
+
+rf_prob = rf_model.predict_proba(X_test)[:,1]
+
+print("\n===== Random Forest =====")
+
+print("Accuracy :", accuracy_score(y_test, rf_pred))
+
+print("Precision :", precision_score(y_test, rf_pred))
+
+print("Recall :", recall_score(y_test, rf_pred))
+
+print("ROC AUC :", roc_auc_score(y_test, rf_prob))
+
+cm = confusion_matrix(y_test, rf_pred)
+
+disp = ConfusionMatrixDisplay(
+    confusion_matrix=cm
+)
+
+disp.plot()
+
+plt.title("Random Forest Confusion Matrix")
+
+plt.show()
+
+importance = pd.DataFrame({
+    "Feature": X.columns,
+    "Importance": rf_model.feature_importances_
+})
+
+importance = importance.sort_values(
+    by="Importance",
+    ascending=False
+)
+
+print("\nFeature Importance")
+
+print(importance)
+
+plt.figure(figsize=(7,4))
+
+plt.bar(
+    importance["Feature"],
+    importance["Importance"]
+)
+
+plt.title("Feature Importance")
+
+plt.xlabel("Features")
+
+plt.ylabel("Importance")
+
+plt.show()
+
+new_customer = pd.DataFrame({
+    "Employed":[1],
+    "Bank Balance":[75000],
+    "Annual Salary":[600000]
+})
+
+prediction = rf_model.predict(new_customer)
+
+if prediction[0] == 1:
+    print("\nPrediction : Loan Default")
+else:
+    print("\nPrediction : No Loan Default")
